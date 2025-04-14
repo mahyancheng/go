@@ -1,46 +1,58 @@
+import asyncio
+from typing import List, Optional
 from ollama import AsyncClient
+from pydantic import PrivateAttr
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import BaseMessage, AIMessage
 
-class LLMHandler:
-    """
-    Handles communication with the qwen2.5:32b-instruct model via Ollama.
-    Implements asynchronous methods for generating responses and provides
-    a minimal dict-like interface so that downstream code can use get, pop, etc.
-    """
-    def __init__(self, model_name: str = "qwen2.5:32b-instruct"):
+class LLMHandler(BaseChatModel):
+    model: str = "qwen2.5:32b-instruct"
+    # Declare a private attribute using PrivateAttr so it is not a field.
+    _client: AsyncClient = PrivateAttr()
+
+    def __init__(self, model_name: str = "qwen2.5:32b-instruct", **data):
+        # Initialize BaseChatModel with the field "model"
+        super().__init__(model=model_name, **data)
         self.model = model_name
-        self.client = AsyncClient()
-        self._store = {}  # For minimal dict-like behavior
+        # Set the asynchronous client as a private attribute.
+        self._client = AsyncClient()
 
-    async def generate(self, messages: list[dict], stream: bool = False) -> str:
-        if stream:
-            chunks = []
-            async for chunk in await self.client.chat(model=self.model, messages=messages, stream=True):
-                chunks.append(chunk["message"]["content"])
-            return "".join(chunks)
-        else:
-            response = await self.client.chat(model=self.model, messages=messages, stream=False)
-            return response["message"]["content"]
+    # Implement _llm_type as a regular method (not as a property)
+    def _llm_type(self) -> str:
+        return "ollama"
 
-    async def invoke(self, messages: list[dict], **kwargs) -> str:
-        message_history = list(messages)
-        response = await self.client.chat(model=self.model, messages=message_history)
-        return response["message"]["content"]
+    async def _agenerate(
+        self,
+        messages: List[BaseMessage],
+        stop: Optional[List[str]] = None,
+        **kwargs,
+    ) -> dict:
+        # Convert the messages to the expected list of dictionaries.
+        message_list = [{"role": m.role, "content": m.content} for m in messages]
+        response = await self._client.chat(model=self.model, messages=message_list, stream=False)
+        content = response["message"]["content"]
+        # Wrap the response as expected by BaseChatModel.
+        return {"generations": [[AIMessage(content=content, role="assistant")]]}
 
-    async def aget(self, messages: list[dict], **kwargs) -> str:
-        """
-        Asynchronous alias for invoke.
-        """
-        return await self.invoke(messages, **kwargs)
+    def _generate(
+        self,
+        messages: List[BaseMessage],
+        stop: Optional[List[str]] = None,
+        **kwargs,
+    ) -> dict:
+        # Synchronously execute the asynchronous generation.
+        return asyncio.run(self._agenerate(messages, stop=stop, **kwargs))
 
-    # --- Mapping (dict-like) interface ---
-    def __getitem__(self, key):
-        return self._store.get(key)
+    async def ainvoke(self, messages: List[BaseMessage], **kwargs) -> AIMessage:
+        result = await self._agenerate(messages, **kwargs)
+        return result["generations"][0][0]
 
-    def __setitem__(self, key, value):
-        self._store[key] = value
+    def invoke(self, messages: List[BaseMessage], **kwargs) -> AIMessage:
+        return self._generate(messages, **kwargs)
 
-    def pop(self, key, default=None):
-        return self._store.pop(key, default)
+    async def aget(self, messages: List[BaseMessage], **kwargs) -> str:
+        ai_message = await self.ainvoke(messages, **kwargs)
+        return ai_message.content
 
-    def get(self, key, default=None):
-        return self._store.get(key, default)
+    def get(self, messages: List[BaseMessage], **kwargs) -> str:
+        return self.invoke(messages, **kwargs)

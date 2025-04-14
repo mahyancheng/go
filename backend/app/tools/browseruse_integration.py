@@ -4,10 +4,10 @@ import asyncio
 import gradio as gr
 import traceback
 
-# Use absolute imports from the top-level 'src' package (which is now available because we added tools/ to sys.path).
-from src.browser.custom_browser import CustomBrowser
-from src.browser.custom_context import BrowserContextConfig
-from src.controller.custom_controller import CustomController
+# Use absolute imports based on the "app" package.
+from app.tools.src.browser.custom_browser import CustomBrowser
+from app.tools.src.browser.custom_context import BrowserContextConfig
+from app.tools.src.controller.custom_controller import CustomController
 
 _global_browser = None
 _global_browser_context = None
@@ -17,8 +17,8 @@ async def run_custom_agent(
         llm,
         use_own_browser,
         keep_browser_open,
-        headless,            # Provided but not used.
-        disable_security,    # Provided but not used.
+        headless,            # Provided but not used by CustomBrowser.
+        disable_security,    # Provided but not used by CustomBrowser.
         window_w,
         window_h,
         save_recording_path,
@@ -41,16 +41,18 @@ async def run_custom_agent(
 ):
     global _global_browser, _global_browser_context, _global_agent
 
+    # Build extra arguments for logging/debugging (not passed to CustomBrowser).
     extra_args = ["--accept_downloads=True", f"--window-size={window_w},{window_h}"]
     if use_own_browser:
         chrome_user_data = os.getenv("CHROME_USER_DATA", None)
         if chrome_user_data:
             extra_args.append(f"--user-data-dir={chrome_user_data}")
     
-    # Create a new CustomBrowser instance without unsupported parameters.
+    # Create a new CustomBrowser instance.
     if _global_browser is None:
         _global_browser = CustomBrowser()
     
+    # For window sizing, pass a simple dictionary.
     browser_window_size = {"width": window_w, "height": window_h}
     
     if _global_browser_context is None:
@@ -64,7 +66,9 @@ async def run_custom_agent(
             )
         )
     
-    from src.agent.custom_agent import CustomAgent
+    # Import CustomAgent and the custom prompt classes.
+    from app.tools.src.agent.custom_agent import CustomAgent
+    from app.tools.src.agent.custom_prompts import CustomSystemPrompt, CustomAgentMessagePrompt
     controller = CustomController()
     
     if _global_agent is None:
@@ -76,8 +80,9 @@ async def run_custom_agent(
             browser=_global_browser,
             browser_context=_global_browser_context,
             controller=controller,
-            system_prompt_class=None,
-            agent_prompt_class=None,
+            system_prompt_class=CustomSystemPrompt,
+            agent_prompt_class=CustomAgentMessagePrompt,
+            page_extraction_llm={},  # Set to empty dict to satisfy validation
             max_actions_per_step=max_actions_per_step,
             tool_calling_method=tool_calling_method,
             max_input_tokens=max_input_tokens,
@@ -93,6 +98,7 @@ async def run_custom_agent(
     trace_files = glob.glob(os.path.join(save_trace_path, "*.zip")) if save_trace_path else None
     trace_file = trace_files[0] if trace_files else None
     
+    # Clean up if the browser is not to be kept open.
     _global_agent = None
     if not keep_browser_open:
         if _global_browser_context:
@@ -102,5 +108,14 @@ async def run_custom_agent(
             await _global_browser.close()
             _global_browser = None
     
-    return (final_result, errors, model_actions, model_thoughts, None, trace_file, history_file,
-            gr.update(value="Stop", interactive=True), gr.update(interactive=True))
+    return (
+        final_result,
+        errors,
+        model_actions,
+        model_thoughts,
+        None,
+        trace_file,
+        history_file,
+        gr.update(value="Stop", interactive=True),
+        gr.update(interactive=True)
+    )
