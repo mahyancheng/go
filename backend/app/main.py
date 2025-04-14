@@ -1,9 +1,15 @@
+import os
 import sys
 import asyncio
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 
-# For Windows, use the ProactorEventLoopPolicy for better subprocess compatibility.
+# Add the tools directory to sys.path so that the src folder (moved into tools) is available as a top-level package.
+tools_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "tools"))
+if tools_dir not in sys.path:
+    sys.path.insert(0, tools_dir)
+
+# For Windows, set the asyncio event loop policy
 if sys.platform.startswith("win"):
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
