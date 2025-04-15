@@ -1,2 +1,0 @@
-1. [ ] Use the browser to search for top news headlines from reputable sources.
-2. [ ] Use the code_interpreter to analyze and summarize the top 3 news stories based on relevance and frequency across sources.
