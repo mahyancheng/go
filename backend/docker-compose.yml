@@ -1,0 +1,10 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - OLLAMA_ENDPOINT=http://host.docker.internal:11434
+      - BROWSER_AGENT_INTERNAL_MODEL=qwen2.5:7b
