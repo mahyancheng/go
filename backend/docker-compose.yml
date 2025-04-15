@@ -1,0 +1,29 @@
+# backend/docker-compose.yml
+# Run this from the 'backend' directory using 'docker compose up --build'
+services:
+  backend:
+    build:
+      context: .. # Build context is the parent directory (mahyancheng-go)
+      dockerfile: backend/Dockerfile # Path to Dockerfile relative to context
+    ports:
+      - "8000:8000" # Map host port 8000 to container port 8000
+    environment:
+      # Tells the app inside docker how to reach Ollama on the HOST machine
+      # 'host.docker.internal' works on Docker Desktop (Win/Mac)
+      # On Linux, might need '--network="host"' or replace with host IP
+      - OLLAMA_ENDPOINT=http://host.docker.internal:11434
+      # Set the internal browser agent LLM (run_browser_task.py reads this)
+      - BROWSER_AGENT_INTERNAL_MODEL=qwen2.5:7b
+      # Add other necessary env vars if your specific code needs them
+      # - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      # - PLANNING_TOOLING_MODEL=llama3:latest # If your llm_handler reads this
+    volumes:
+      # Optional: Mount tasks directory to persist task files outside container
+      - ./tasks:/app/tasks
+      # Optional: Mount .env file if you have one in backend/
+      # - ./.env:/app/.env
+
+    # Add extra_hosts for Linux if host.docker.internal doesn't work
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway"
+
