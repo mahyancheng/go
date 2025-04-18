@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+# browser-use==0.1.40   # Removed because it isn’t published on PyPI (you can install from a Git repo instead)
+playwright
+ollama
+python-dotenv
+pyperclip==1.9.0
+gradio==5.23.1
+json-repair
+MainContentExtractor==0.0.4
